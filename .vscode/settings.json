@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "lcd-routines.h": "c",
+        "delay.h": "c",
+        "iom8.h": "c",
+        "stdint.h": "c",
+        "uart.h": "c",
+        "lcd.h": "c",
+        "string.h": "c",
+        "matrix_keypad.h": "c",
+        "stepper.h": "c"
+    }
+}
