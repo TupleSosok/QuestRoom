@@ -15,7 +15,7 @@ const char keymap[NUM_ROWS][NUM_COLS] = {
 };
 
 // Function prototypes
-void keypad_init(const uint8_t rows[], const uint8_t cols[])
+void keypadInit(const uint8_t rows[], const uint8_t cols[])
 {
         // Set rows as outputs and initialize to high
     for (uint8_t i = 0; i < NUM_ROWS; i++) {
@@ -31,7 +31,7 @@ void keypad_init(const uint8_t rows[], const uint8_t cols[])
         PORTB |= (1 << col_pin);
     }
 }
-char keypad_get_key(const uint8_t rows[], const uint8_t cols[])
+char keypadGetKey(const uint8_t rows[], const uint8_t cols[])
 {
         for (uint8_t row = 0; row < NUM_ROWS; row++) {
         // Set the current row low

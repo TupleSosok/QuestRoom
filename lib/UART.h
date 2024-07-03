@@ -2,30 +2,30 @@
 #include <util/delay.h>
 
 
-void uart_transmit(unsigned char data) {
+void uartTransmit(unsigned char data) {
     // Wait for empty transmit buffer
     while (!( UCSRA & (1<<UDRE)));
     // Put data into buffer, sends the data
     UDR = data;
 }
 
-unsigned char uart_receive(void) {
+unsigned char uartReceive(void) {
     // Wait for data to be received
     while (!(UCSRA & (1<<RXC)));
     // Get and return received data from buffer
     return UDR;
 }
 
-void uart_transmit_string(const char* str) {
+void uartTransmitString(const char* str) {
     while (*str) {
-        uart_transmit(*str++);
+        uartTransmit(*str++);
     }
 }
 
-char* uart_receive_number(void) {
+char* uartReceiveNumber(void) {
     static char buffer[5]; // Статический буфер для хранения строки числа
     for (uint8_t i = 0; i < 4; i++) {
-        buffer[i] = uart_receive(); // Получение каждого символа числа
+        buffer[i] = uartReceive(); // Получение каждого символа числа
     }
     buffer[4] = '\0'; // Завершение строки
 

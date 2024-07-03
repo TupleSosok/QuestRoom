@@ -60,13 +60,13 @@ void waitForConnection()
     unsigned char response = 'B';
     bool received_request = false;
     while (!received_request) {
-        request = uart_receive();
-        //lcd_char(request);
+        request = uartReceive();
+        //lcdChar(request);
 
         if (request == 'A') {
             received_request = true;
-            uart_transmit(response);
-            lcd_string("Initialize...");
+            uartTransmit(response);
+            lcdString("Initialize...");
         }
     }
 }
@@ -81,7 +81,7 @@ void enterKey(char* request)
     memset(password, 0, sizeof(password));
     while (!enter_flag)
     {
-        key = keypad_get_key(row_pins, col_pins);
+        key = keypadGetKey(row_pins, col_pins);
         if (key)
         {
             if (key != '#' && key != '*')
@@ -90,53 +90,53 @@ void enterKey(char* request)
                 {
                     password[index] = key;
                     index++;
-                    lcd_char('*');
+                    lcdChar('*');
                 }
             }
             else if (key == '#')
             {
                 try_count++;
                 password[index] = '\0';
-                uart_transmit_string(password);
-                char answer = uart_receive();
+                uartTransmitString(password);
+                char answer = uartReceive();
                 if (answer == 'D')
                 {
-                    lcd_clear();
-                    lcd_set_cursor(0, 0);
-                    lcd_string("Correct!");
+                    lcdClear();
+                    lcdSetCursor(0, 0);
+                    lcdString("Correct!");
                     enter_flag = true;
                 }
                 else if (answer == 'E')
                 {
-                    lcd_clear();
-                    lcd_set_cursor(0, 0);
-                    lcd_string("Incorrect!");
-                    lcd_set_cursor(0,1);
-                    lcd_string("Popitok: ");
-                    lcd_char(((3 - try_count) + '0'));
+                    lcdClear();
+                    lcdSetCursor(0, 0);
+                    lcdString("Incorrect!");
+                    lcdSetCursor(0,1);
+                    lcdString("Popitok: ");
+                    lcdChar(((3 - try_count) + '0'));
                     index = 0;
                     memset(password, 0, sizeof(password));
                     _delay_ms(1000);
-                    lcd_clear();
-                    lcd_set_cursor(0, 0);
-                    lcd_string(request);
-                    lcd_set_cursor(0,1);
+                    lcdClear();
+                    lcdSetCursor(0, 0);
+                    lcdString(request);
+                    lcdSetCursor(0,1);
                 }
             }
             else if (key == '*')
             {
                 index = 0;
                 memset(password, 0, sizeof(password));
-                lcd_clear();
-                lcd_string(request);
-                lcd_set_cursor(0,1);
+                lcdClear();
+                lcdString(request);
+                lcdSetCursor(0,1);
             }
         }
         if (try_count > 2)
         {
-            lcd_clear();
-            lcd_set_cursor(0, 0);
-            lcd_string("Popitok nema!");
+            lcdClear();
+            lcdSetCursor(0, 0);
+            lcdString("Popitok nema!");
             enter_flag = true;
         }
     }
@@ -147,73 +147,73 @@ void receiveKey()
     char* request;
     bool received_responce = false;
     while (!received_responce) {
-        request = uart_receive_number();
-        uart_transmit('C');
-        lcd_clear();
-        lcd_string(request);
-        lcd_set_cursor(0,1);
+        request = uartReceiveNumber();
+        uartTransmit('C');
+        lcdClear();
+        lcdString(request);
+        lcdSetCursor(0,1);
         received_responce = true;
         enterKey(request);
     }
 }
 
 int getNumFromUART(){
-    return (int) uart_receive();
+    return (int) uartReceive();
 }
 
 void getSettings()
 {
     //0 - 100 проценты заполнения
     //255 - окончание
-    lcd_clear();
-    lcd_set_cursor(0,0);
+    lcdClear();
+    lcdSetCursor(0,0);
     char procentStr[4] = "";
     char hzStr[4] = "";
-    int procent = (int) uart_receive();
-    int hz = (int) uart_receive();
+    int procent = (int) uartReceive();
+    int hz = (int) uartReceive();
     while(procent != 255 && hz != 255){
-        lcd_clear();
+        lcdClear();
         
         itoa(procent, procentStr, 10);
         itoa(hz,hzStr, 10);
 
-        lcd_string(procentStr);
-        lcd_char('%');
-        lcd_char(' ');
-        lcd_string("HZ");
-        lcd_string(hzStr);
+        lcdString(procentStr);
+        lcdChar('%');
+        lcdChar(' ');
+        lcdString("HZ");
+        lcdString(hzStr);
 
-        procent = (int) uart_receive();
-        hz = (int) uart_receive();
+        procent = (int) uartReceive();
+        hz = (int) uartReceive();
     }
 }
 
 //если 3 пакета потерялись то все
 bool acceptingPackages(){
-    lcd_set_cursor(0,0);
+    lcdSetCursor(0,0);
     char str[4] = "";
-    int num = (int) uart_receive();
+    int num = (int) uartReceive();
     int mistakes = 0;
     int number_of_package = 0;
     while(num != 255 && mistakes < 3){
         if(num == number_of_package){
             ++number_of_package;
-            lcd_clear();
+            lcdClear();
             itoa(num, str, 10);
-            lcd_string(str);
+            lcdString(str);
             mistakes = 0;
         }
         else{
-            lcd_clear();
-            lcd_string("Missing");
+            lcdClear();
+            lcdString("Missing");
             mistakes += num - number_of_package;
             number_of_package = num;
         }
-        num = (int) uart_receive();
+        num = (int) uartReceive();
     }
     if(mistakes >= 3){
-        lcd_clear();
-        lcd_string("Errore");
+        lcdClear();
+        lcdString("Errore");
         return false;
     }
     return true;
@@ -222,16 +222,16 @@ bool acceptingPackages(){
 int main()
 {
     init();
-    lcd_init(); // Инициализация LCD
+    lcdInit(); // Инициализация LCD
     bool rerole = true;
     while(rerole){
-        keypad_init(row_pins, col_pins); 
+        keypadInit(row_pins, col_pins); 
         waitForConnection();
         receiveKey();
         getSettings();
         rerole = !acceptingPackages();
     }
-    lcd_clear();
-    lcd_string("Good Job");
+    lcdClear();
+    lcdString("Good Job");
     return 0;
 }

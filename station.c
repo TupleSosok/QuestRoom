@@ -138,9 +138,9 @@ int generateRandomInt(int min, int max)
 
 unsigned char* generateRandomKey()
 {
-    int8_t num = EEPROM_read(1);
+    int8_t num = EEPROMRead(1);
     int8_t newNum = num + 1;
-    EEPROM_write(1, newNum);
+    EEPROMWrite(1, newNum);
     srand(newNum);
     
     static unsigned char number_str[5];
@@ -170,17 +170,17 @@ void enterKey() {
     unsigned char response;
     bool received_responce = false;
     while (!received_responce) {
-        uart_transmit_string(visibleCode);
-        response = uart_receive();
+        uartTransmitString(visibleCode);
+        response = uartReceive();
         if (response == 'C')
         {
             bool received_accept = false;
             while (!received_accept)
             {
-                char* responce_password = uart_receive_number();
+                char* responce_password = uartReceiveNumber();
                 if (strcmp(responce_password, key) == 0)
                 {
-                    uart_transmit('D');
+                    uartTransmit('D');
                     received_accept = true;
                     received_responce = true;
                     PORT_LED_1_Y &= ~(1<<LED_1_Y);
@@ -188,7 +188,7 @@ void enterKey() {
                 }
                 else
                 {
-                    uart_transmit('E');
+                    uartTransmit('E');
                     makeNoise();
                 }
             }
@@ -201,10 +201,10 @@ void checkMobileConnection() {
     unsigned char response;
     bool received_responce = false;
     while (!received_responce) {
-        uart_transmit(request);
+        uartTransmit(request);
         _delay_ms(100);
 
-        response = uart_receive();
+        response = uartReceive();
         if (response == 'B') {
             received_responce = true;
         }
@@ -263,8 +263,8 @@ void setSettings() {
         }
 
         if(direction1 != 0 || direction2 != 0){
-            uart_transmit((char)position1);
-            uart_transmit((char)position2);
+            uartTransmit((char)position1);
+            uartTransmit((char)position2);
 
             int hzProcent = 50 - abs(needHZ - position2);
             int positionProcent = position1 / 2;
@@ -282,8 +282,8 @@ void setSettings() {
         }
     }
     //потому что 2 принимает
-    uart_transmit((char)255);
-    uart_transmit((char)255);
+    uartTransmit((char)255);
+    uartTransmit((char)255);
     PORT_LED_2_Y &= ~(1<<LED_2_Y);
     PORT_LED_2_R &= ~(1<<LED_2_R);
 }
@@ -307,7 +307,7 @@ void packetTransfer(){
         _delay_ms(200);
         int chance = rand() % 100;
         if(chance < total_percent){
-            uart_transmit((char)i);
+            uartTransmit((char)i);
             mistakes = 0;
         }
         else{
@@ -322,7 +322,7 @@ void packetTransfer(){
         PORT_LED_3_G |= (1<<LED_3_G);
     else
         PORT_LED_3_Y &= ~(1<<LED_3_Y);
-    uart_transmit((char)255);
+    uartTransmit((char)255);
     PORT_LED_3_Y &= ~(1<<LED_3_Y);
     PORT_LED_3_R &= ~(1<<LED_3_R);
 }
