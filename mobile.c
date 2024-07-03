@@ -10,6 +10,14 @@
 const uint8_t row_pins[4] = {3, 2, 1, 0};
 const uint8_t col_pins[3] = {4, 3, 2};
 
+void init();
+void waitForConnection();
+void enterKey(char* request);
+void receiveKey();
+int getNumFromUART();
+void getSettings();
+bool acceptingPackages();
+
 void init()
 {
     // DDR_LCD_SDA |= (1<<LCD_SDA);
@@ -46,7 +54,7 @@ void init()
     sei();
 }
 
-void wait_for_connect()
+void waitForConnection()
 {
     unsigned char request;
     unsigned char response = 'B';
@@ -63,7 +71,7 @@ void wait_for_connect()
     }
 }
 
-void enter_key(char* request)
+void enterKey(char* request)
 {
     char key;
     int try_count = 0;
@@ -134,7 +142,7 @@ void enter_key(char* request)
     }
 }
 
-void receive_key()
+void receiveKey()
 {
     char* request;
     bool received_responce = false;
@@ -145,7 +153,7 @@ void receive_key()
         lcd_string(request);
         lcd_set_cursor(0,1);
         received_responce = true;
-        enter_key(request);
+        enterKey(request);
     }
 }
 
@@ -153,28 +161,77 @@ int getNumFromUART(){
     return (int) uart_receive();
 }
 
-void get_settings()
+void getSettings()
 {
     //0 - 100 проценты заполнения
     //255 - окончание
+    lcd_clear();
+    lcd_set_cursor(0,0);
+    char procentStr[4] = "";
+    char hzStr[4] = "";
+    int procent = (int) uart_receive();
+    int hz = (int) uart_receive();
+    while(procent != 255 && hz != 255){
+        lcd_clear();
+        
+        itoa(procent, procentStr, 10);
+        itoa(hz,hzStr, 10);
+
+        lcd_string(procentStr);
+        lcd_char('%');
+        lcd_char(' ');
+        lcd_string("HZ");
+        lcd_string(hzStr);
+
+        procent = (int) uart_receive();
+        hz = (int) uart_receive();
+    }
+}
+
+//если 3 пакета потерялись то все
+bool acceptingPackages(){
     lcd_set_cursor(0,0);
     char str[4] = "";
     int num = (int) uart_receive();
-    while(num != 255){
-        int num = (int) uart_receive();
-        lcd_clear();
-        itoa(num, str, 10);
-        lcd_string(str);
+    int mistakes = 0;
+    int number_of_package = 0;
+    while(num != 255 && mistakes < 3){
+        if(num == number_of_package){
+            ++number_of_package;
+            lcd_clear();
+            itoa(num, str, 10);
+            lcd_string(str);
+            mistakes = 0;
+        }
+        else{
+            lcd_clear();
+            lcd_string("Missing");
+            mistakes += num - number_of_package;
+            number_of_package = num;
+        }
+        num = (int) uart_receive();
     }
+    if(mistakes >= 3){
+        lcd_clear();
+        lcd_string("Errore");
+        return false;
+    }
+    return true;
 }
 
 int main()
 {
     init();
     lcd_init(); // Инициализация LCD
-    //keypad_init(row_pins, col_pins); 
-    //wait_for_connect();
-    //receive_key();
-    get_settings();
+    bool rerole = true;
+    while(rerole){
+        keypad_init(row_pins, col_pins); 
+        waitForConnection();
+        receiveKey();
+        getSettings();
+        rerole = !acceptingPackages();
+    }
+    lcd_clear();
+    lcd_string("Good Job");
     return 0;
 }

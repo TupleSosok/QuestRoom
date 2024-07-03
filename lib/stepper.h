@@ -61,3 +61,13 @@ void counterClockWiseStep(int times)
         delay();    
     }       
 }
+
+void stepperStep(int direction) {
+    // Направление вращения
+    if (direction > 0) {
+        clockWiseStep(direction);
+    } 
+    else if (direction < 0) {
+        counterClockWiseStep(direction * -1);
+    }
+}

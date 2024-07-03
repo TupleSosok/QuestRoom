@@ -8,6 +8,8 @@
         "lcd.h": "c",
         "string.h": "c",
         "matrix_keypad.h": "c",
-        "stepper.h": "c"
+        "stepper.h": "c",
+        "eeprom.h": "c",
+        "interrupt.h": "c"
     }
 }

@@ -6,15 +6,31 @@
 #include <time.h>
 #include <string.h>
 
+#include "lib/encoder.h"
+#include "lib/eeprom.h"
 #include "lib/UART.h"
 #include "lib/stepper.h"
+
+int total_percent = 0;
+int minHZ = 70;
+int maxHZ = 120;
+int steps = 100;
+int needHZ = 115;
 
 bool tumbler_1_flag = false;
 bool tumbler_2_flag = false;
 bool tumbler_3_flag = false;
 
-volatile int16_t encoder_position = 0;
-volatile int16_t stepper_position = 0;
+void init();
+void makeNoise();
+int generateRandomInt();
+unsigned char* generateRandomKey();
+void enterKey();
+void checkMobileConnection();
+void waitFstTumbler();
+void setSettings();
+void waitSndTumbler();
+void packetTransfer();
 
 void init()
 {
@@ -102,11 +118,31 @@ void init()
 	UCSRB = (1<<RXEN) | (1<<TXEN);
 	UCSRC = (1<<URSEL) | (1<<UCSZ0) | (1<<UCSZ1);
     
+    // Enable interrupts for the switches
+    //PCMSK2 |= _BV(PCINT22) | _BV(PCINT23); // Enable interrupts for PD6 and PD7
+    //PCMSK0 |= _BV(PCINT0); // Enable interrupt for PB0  
     sei(); // Enable global interrupts
 }
 
-unsigned char* generate_random_key()
+void makeNoise(){
+    PORT_SPEAKER |= (1<<SPEAKER);
+    _delay_ms(3);
+    PORT_SPEAKER &= ~(1<<SPEAKER);
+}
+
+int generateRandomInt(int min, int max)
 {
+    int angle = rand()%max + min;
+    return angle;
+}
+
+unsigned char* generateRandomKey()
+{
+    int8_t num = EEPROM_read(1);
+    int8_t newNum = num + 1;
+    EEPROM_write(1, newNum);
+    srand(newNum);
+    
     static unsigned char number_str[5];
     for (int i = 0; i < 4; i++)
     {
@@ -116,12 +152,25 @@ unsigned char* generate_random_key()
     return number_str;
 }
 
-void enter_key() {
-    unsigned char* key = generate_random_key();
+//Надо +1 к первой цифры, если 9 тогда это было 0
+void enterKey() {
+    unsigned char* key = generateRandomKey();
+    unsigned char* visibleCode = (unsigned char*)malloc(sizeof(unsigned char) * (strlen(key) + 1));;
+    strcpy(visibleCode, key);
+
+    // //Перетасовка кода и того что показывается
+    unsigned char firstNum = visibleCode[0];
+    //48 код нуля
+    if(firstNum == '0') 
+        firstNum = '9';
+    else 
+        --firstNum;
+    visibleCode[0] = firstNum;
+
     unsigned char response;
     bool received_responce = false;
     while (!received_responce) {
-        uart_transmit_string(key);
+        uart_transmit_string(visibleCode);
         response = uart_receive();
         if (response == 'C')
         {
@@ -140,16 +189,14 @@ void enter_key() {
                 else
                 {
                     uart_transmit('E');
-                    PORT_SPEAKER |= (1<<SPEAKER);
-                    _delay_ms(100);
-                    PORT_SPEAKER &= ~(1<<SPEAKER);
+                    makeNoise();
                 }
             }
         }
     }
 }
 
-void mobile_connect() {
+void checkMobileConnection() {
     unsigned char request = 'A';
     unsigned char response;
     bool received_responce = false;
@@ -164,145 +211,132 @@ void mobile_connect() {
     }
     PORT_LED_1_R &= ~(1<<LED_1_R);
     PORT_LED_1_Y |= (1<<LED_1_Y);
-    enter_key();
+    enterKey();
 }
 
-void wait_1st_tumbler() {
+void waitFstTumbler() {
     while (true)
     {
         if (!(PIN_TUMBLER_1 & (1 << TUMBLER_1)))
         {
             tumbler_1_flag = true;
-            mobile_connect();
+            checkMobileConnection();
             break;
         }
     }
 }
 
-void stepper_step(int direction) {
-    // Направление вращения
-    if (direction > 0) {
-        clockWiseStep(direction);
-    } 
-    else if (direction < 0) {
-        counterClockWiseStep(direction * -1);
-    }
-}
-
-int generate_random_angle()
-{
-    int angle = rand()%360;
-    return angle;
-}
-
-uint8_t read_engine_encoder() 
-{ 
- uint8_t val=0; 
-
-  if(!bit_is_clear(PIN_ENCODER_1_DT, ENCODER_1_DT)) 
-	val |= (1<<1); 
-
-  if(!bit_is_clear(PIN_ENCODER_1_CLK, ENCODER_1_CLK)) 
-	val |= (1<<0); 
-
-  return val; 
-}
-
-/*
-num - номер енкодера
-*/
-uint8_t read_encoder(uint8_t num) 
-{ 
-    uint8_t val=0; 
-    bool encoderBit1;
-    bool encoderBit2;
-    switch (num)
-    {
-    case 1:
-        encoderBit1 = !bit_is_clear(PIN_ENCODER_1_DT, ENCODER_1_DT);
-        encoderBit2 = !bit_is_clear(PIN_ENCODER_1_CLK, ENCODER_1_CLK);
-        break;
-    case 2:
-        encoderBit1 = !bit_is_clear(PIN_ENCODER_2_DT, ENCODER_2_DT);
-        encoderBit2 = !bit_is_clear(PIN_ENCODER_2_CLK, ENCODER_2_CLK);
-        break;
-    default:
-        break;
-    }
-
-    if(encoderBit1) val |= (1<<1); 
-    if(encoderBit2) val |= (1<<0); 
-    return val; 
-}
-
-void set_settings() {
-    int angle = generate_random_angle();
-    uint8_t current_pos = 0, last_pos = 0;
-    last_pos = read_encoder(1); 
+void setSettings() {
+    int8_t position1 = 10, position2 = minHZ;
+    int angle = generateRandomInt(0, steps);
+    int hz = generateRandomInt(0, maxHZ - minHZ);
+    int relation = 100/steps;
     while ((PIN_TUMBLER_3 & (1 << TUMBLER_3)))
     {
-        current_pos = read_encoder(1);
+        int8_t direction1 = getEncoderDirection(1);
+        if(direction1 > 0){
+            position1 += 1;
+            stepperStep(1); 
+        }
+        if(direction1 < 0){
+            position1 -= 1;
+            stepperStep(-1); 
+        }
 
-        if(current_pos != last_pos) 
-	    { 
-		    if((last_pos==3 && current_pos==1) || (last_pos==0 && current_pos==2)) 
-		    { 
-                encoder_position++;
-                stepper_step(1); 
-		    } 
-		    else if((last_pos==2 && current_pos==0) || (last_pos==1 && current_pos==3)) 
-		    { 
-                encoder_position--;
-                stepper_step(-1); 
-		    } 
-
-		   last_pos = current_pos; 
-	    } 
-
-        // Приведение шагового двигателя в положение энкодера
-        if (encoder_position > stepper_position) {
-            stepper_step(1);  // Шаг вперед
-            stepper_position++;
-            uart_transmit((char)stepper_position);
-            //_delay_ms(256);
-        } else if (encoder_position < stepper_position) {
-            stepper_step(-1); // Шаг назад
-            stepper_position--;
-            //_delay_ms(256);
-            uart_transmit((char)stepper_position);
+        if(direction1 != 0){
+            if(position1 > 100) position1 = 0;
+            if(position1 < 0) position1 = 100;
         }
         
-        current_pos = read_encoder(1);
-        last_pos = current_pos;
-        //чтобы прокрутки не было
-        _delay_ms(1);
+    
+        int8_t direction2 = getEncoderDirection(2);
+        if(direction2 > 0){
+            position2 += 1;
+        }
+        if(direction2 < 0){
+            position2 -= 1;
+        }
+    
+        if(direction2 != 0){
+            if(position2 > maxHZ) position2 = maxHZ;
+            if(position2 < minHZ) position2 = minHZ;
+        }
+
+        if(direction1 != 0 || direction2 != 0){
+            uart_transmit((char)position1);
+            uart_transmit((char)position2);
+
+            int hzProcent = 50 - abs(needHZ - position2);
+            int positionProcent = position1 / 2;
+            total_percent = positionProcent + hzProcent;
+
+            if(total_percent > 85)
+                PORT_LED_2_Y |= (1<<LED_2_Y);
+            else
+                PORT_LED_2_Y &= ~(1<<LED_2_Y);
+
+            if(total_percent > 97)
+                PORT_LED_2_G |= (1<<LED_2_G);
+            else
+                PORT_LED_2_G &= ~(1<<LED_2_G);
+        }
     }
+    //потому что 2 принимает
+    uart_transmit((char)255);
+    uart_transmit((char)255);
+    PORT_LED_2_Y &= ~(1<<LED_2_Y);
+    PORT_LED_2_R &= ~(1<<LED_2_R);
 }
 
-void wait_2nd_tumbler() {
+void waitSndTumbler() {
     while (true)
     {
         if (!(PIN_TUMBLER_2 & (1 << TUMBLER_2)))
         {
             tumbler_2_flag = true;
-            set_settings();
+            setSettings();
             break;
         }
     }
 }
 
+void packetTransfer(){
+    PORT_LED_3_Y |= (1<<LED_3_Y);
+    int mistakes = 0;
+    for(int i = 0; i < 100 && mistakes < 3; ++i){
+        _delay_ms(200);
+        int chance = rand() % 100;
+        if(chance < total_percent){
+            uart_transmit((char)i);
+            mistakes = 0;
+        }
+        else{
+            PORT_LED_3_Y &= ~(1<<LED_3_Y);
+            _delay_ms(10);
+            PORT_LED_3_Y |= (1<<LED_3_Y);
+            ++mistakes;
+            makeNoise();
+        }
+    }
+    if(mistakes < 3) 
+        PORT_LED_3_G |= (1<<LED_3_G);
+    else
+        PORT_LED_3_Y &= ~(1<<LED_3_Y);
+    uart_transmit((char)255);
+    PORT_LED_3_Y &= ~(1<<LED_3_Y);
+    PORT_LED_3_R &= ~(1<<LED_3_R);
+}
+
 int main()
 {
     init();
-
     PORT_LED_1_R |= (1<<LED_1_R);
     PORT_LED_2_R |= (1<<LED_2_R);
     PORT_LED_3_R |= (1<<LED_3_R);
 
-    // while(true) {
-    //     stepper_step(10);
-    // }
-    //stepper_step(1);  
-    //wait_1st_tumbler();
-    wait_2nd_tumbler();
+    waitFstTumbler();
+
+    waitSndTumbler();
+   
+    packetTransfer();
 }
