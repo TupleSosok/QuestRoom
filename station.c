@@ -17,9 +17,10 @@ int maxHZ = 120;
 int steps = 100;
 int needHZ = 115;
 
-bool tumbler_1_flag = false;
-bool tumbler_2_flag = false;
-bool tumbler_3_flag = false;
+bool tumblerFrsflag = false;
+bool tumblerSndflag = false;
+bool tumblerTrdflag = false;
+bool mobileConnected = false;
 
 void init();
 void makeNoise();
@@ -118,9 +119,6 @@ void init()
 	UCSRB = (1<<RXEN) | (1<<TXEN);
 	UCSRC = (1<<URSEL) | (1<<UCSZ0) | (1<<UCSZ1);
     
-    // Enable interrupts for the switches
-    //PCMSK2 |= _BV(PCINT22) | _BV(PCINT23); // Enable interrupts for PD6 and PD7
-    //PCMSK0 |= _BV(PCINT0); // Enable interrupt for PB0  
     sei(); // Enable global interrupts
 }
 
@@ -219,7 +217,7 @@ void waitFstTumbler() {
     {
         if (!(PIN_TUMBLER_1 & (1 << TUMBLER_1)))
         {
-            tumbler_1_flag = true;
+            tumblerFrsflag = true;
             checkMobileConnection();
             break;
         }
@@ -228,9 +226,6 @@ void waitFstTumbler() {
 
 void setSettings() {
     int8_t position1 = 10, position2 = minHZ;
-    int angle = generateRandomInt(0, steps);
-    int hz = generateRandomInt(0, maxHZ - minHZ);
-    int relation = 100/steps;
     while ((PIN_TUMBLER_3 & (1 << TUMBLER_3)))
     {
         int8_t direction1 = getEncoderDirection(1);
@@ -281,7 +276,6 @@ void setSettings() {
                 PORT_LED_2_G &= ~(1<<LED_2_G);
         }
     }
-    //потому что 2 принимает
     uartTransmit((char)255);
     uartTransmit((char)255);
     PORT_LED_2_Y &= ~(1<<LED_2_Y);
@@ -293,7 +287,7 @@ void waitSndTumbler() {
     {
         if (!(PIN_TUMBLER_2 & (1 << TUMBLER_2)))
         {
-            tumbler_2_flag = true;
+            tumblerSndflag = true;
             setSettings();
             break;
         }
@@ -318,11 +312,14 @@ void packetTransfer(){
             makeNoise();
         }
     }
-    if(mistakes < 3) 
+    if(mistakes < 3) {
         PORT_LED_3_G |= (1<<LED_3_G);
-    else
+        uartTransmit((char)255);
+    }
+    else{
         PORT_LED_3_Y &= ~(1<<LED_3_Y);
-    uartTransmit((char)255);
+        uartTransmit((char)254);
+    }
     PORT_LED_3_Y &= ~(1<<LED_3_Y);
     PORT_LED_3_R &= ~(1<<LED_3_R);
 }
@@ -334,9 +331,10 @@ int main()
     PORT_LED_2_R |= (1<<LED_2_R);
     PORT_LED_3_R |= (1<<LED_3_R);
 
+
     waitFstTumbler();
 
     waitSndTumbler();
-   
+    
     packetTransfer();
 }

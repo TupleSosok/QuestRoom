@@ -339,36 +339,6 @@ else
 	endif
 endif
 
-# LCD I2C
-
-# ifeq ($(findstring B, ${LCD_SDA}), B)
-# 	PORT_LCD_SDA=PORTB
-# 	DDR_LCD_SDA=DDRB
-# else
-# 	ifeq ($(findstring C, ${LCD_SDA}), C)
-# 		PORT_LCD_SDA=PORTC
-# 		DDR_LCD_SDA=DDRC
-# 	else
-# 		PORT_LCD_SDA=PORTD
-# 		DDR_LCD_SDA=DDRD
-# 	endif
-# endif
-
-# ifeq ($(findstring B, ${LCD_SCL}), B)
-# 	PORT_LCD_SCL=PORTB
-# 	DDR_LCD_SCL=DDRB
-# else
-# 	ifeq ($(findstring C, ${LCD_SCL}), C)
-# 		PORT_LCD_SCL=PORTC
-# 		DDR_LCD_SCL=DDRC
-# 	else
-# 		PORT_LCD_SCL=PORTD
-# 		DDR_LCD_SCL=DDRD
-# 	endif
-# endif
-
-#LCD
-
 ifeq ($(findstring B, ${LCD_RS}), B)
 	PORT_LCD_RS=PORTB
 	DDR_LCD_RS=DDRB

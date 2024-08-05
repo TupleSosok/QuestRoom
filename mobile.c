@@ -7,8 +7,10 @@
 #include "lib/matrix_keypad.h"
 #include <string.h>
 
-const uint8_t row_pins[4] = {3, 2, 1, 0};
-const uint8_t col_pins[3] = {4, 3, 2};
+const uint8_t rowPins[4] = {3, 2, 1, 0};
+const uint8_t colPins[3] = {4, 3, 2};
+
+bool incorrectPassword = false;
 
 void init();
 void waitForConnection();
@@ -81,7 +83,7 @@ void enterKey(char* request)
     memset(password, 0, sizeof(password));
     while (!enter_flag)
     {
-        key = keypadGetKey(row_pins, col_pins);
+        key = keypadGetKey(rowPins, colPins);
         if (key)
         {
             if (key != '#' && key != '*')
@@ -93,7 +95,7 @@ void enterKey(char* request)
                     lcdChar('*');
                 }
             }
-            else if (key == '#')
+            else if (key == '#' && index == 4)
             {
                 try_count++;
                 password[index] = '\0';
@@ -103,16 +105,16 @@ void enterKey(char* request)
                 {
                     lcdClear();
                     lcdSetCursor(0, 0);
-                    lcdString("Correct!");
+                    lcdString("Correct");
                     enter_flag = true;
                 }
                 else if (answer == 'E')
                 {
                     lcdClear();
                     lcdSetCursor(0, 0);
-                    lcdString("Incorrect!");
+                    lcdString("Incorrect");
                     lcdSetCursor(0,1);
-                    lcdString("Popitok: ");
+                    lcdString("Tries left: ");
                     lcdChar(((3 - try_count) + '0'));
                     index = 0;
                     memset(password, 0, sizeof(password));
@@ -136,7 +138,8 @@ void enterKey(char* request)
         {
             lcdClear();
             lcdSetCursor(0, 0);
-            lcdString("Popitok nema!");
+            lcdString("Access denied");
+            incorrectPassword = true;
             enter_flag = true;
         }
     }
@@ -165,7 +168,6 @@ void getSettings()
 {
     //0 - 100 проценты заполнения
     //255 - окончание
-    lcdClear();
     lcdSetCursor(0,0);
     char procentStr[4] = "";
     char hzStr[4] = "";
@@ -188,32 +190,18 @@ void getSettings()
     }
 }
 
-//если 3 пакета потерялись то все
+
 bool acceptingPackages(){
     lcdSetCursor(0,0);
     char str[4] = "";
     int num = (int) uartReceive();
-    int mistakes = 0;
-    int number_of_package = 0;
-    while(num != 255 && mistakes < 3){
-        if(num == number_of_package){
-            ++number_of_package;
-            lcdClear();
-            itoa(num, str, 10);
-            lcdString(str);
-            mistakes = 0;
-        }
-        else{
-            lcdClear();
-            lcdString("Missing");
-            mistakes += num - number_of_package;
-            number_of_package = num;
-        }
+    while(num != 255 && num != 254){
+        lcdClear();
+        itoa(num, str, 10);
+        lcdString(str);
         num = (int) uartReceive();
     }
-    if(mistakes >= 3){
-        lcdClear();
-        lcdString("Errore");
+    if(num == 254){
         return false;
     }
     return true;
@@ -222,16 +210,26 @@ bool acceptingPackages(){
 int main()
 {
     init();
-    lcdInit(); // Инициализация LCD
-    bool rerole = true;
-    while(rerole){
-        keypadInit(row_pins, col_pins); 
-        waitForConnection();
-        receiveKey();
+    lcdInit();
+    bool goodPackage = true;
+
+    keypadInit(rowPins, colPins); 
+    waitForConnection();
+    receiveKey();
+    if(!incorrectPassword)
+    {
+        lcdString("Turn on 2");
+        _delay_ms(5);
+        lcdSetCursor(1,1);
+        lcdString("Encoder");
         getSettings();
-        rerole = !acceptingPackages();
+        goodPackage = acceptingPackages();
     }
+    
     lcdClear();
-    lcdString("Good Job");
+    if(!goodPackage)
+        lcdString("Errore");
+    else
+        lcdString("Good Job");    
     return 0;
 }
